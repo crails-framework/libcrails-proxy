@@ -1,0 +1,7 @@
+project = libcrails-proxy
+
+using version
+using config
+using test
+using install
+using dist

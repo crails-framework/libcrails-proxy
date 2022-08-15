@@ -1,0 +1,11 @@
+: 1
+name: libcrails-proxy
+version: 0.1.0-a.0.z
+summary: proxy request parser for the crails framework
+license: BSD-C3
+description-file: README.md
+url: https://github.com/crails-framework/libcrails-proxy
+email: michael@unetresgrossebite.com
+depends: * build2 >= 0.15.0
+depends: * bpkg >= 0.15.0
+depends: { libcrails libcrails-http-client } ^2.0.0
