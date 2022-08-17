@@ -1,6 +1,6 @@
 $out_root/
 {
-  include crails/
+  include libcrails-proxy/
 }
 
-export $out_root/libcrails-proxy/$import.target
+export $out_root/crails/request_parsers/$import.target
