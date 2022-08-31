@@ -1,5 +1,6 @@
 #include "proxy.hpp"
 #include <crails/logger.hpp>
+#include <crails/context.hpp>
 #include <crails/http_response.hpp>
 #include <crails/params.hpp>
 #include <crails/client.hpp>
@@ -15,9 +16,10 @@ ProxyRequestHandler::ProxyRequestHandler()
 {
 }
 
-void ProxyRequestHandler::operator()(Connection& connection, BuildingResponse& response, Params& params, function<void (RequestParser::Status)> callback) const
+void ProxyRequestHandler::operator()(Context& context, function<void (RequestParser::Status)> callback) const
 {
-  const auto& request = connection.get_request();
+  const auto& request = context.connection->get_request();
+  auto& response = context.response;
   string destination(request.target());
   auto it = find(rules.cbegin(), rules.cend(), destination);
 
@@ -25,10 +27,10 @@ void ProxyRequestHandler::operator()(Connection& connection, BuildingResponse& r
   {
     const Rule& rule = *it;
 
-    params["uri"] = request.target();
+    context.params["uri"] = request.target();
     if (request.method() != HttpVerb::get && request.method() != HttpVerb::head)
     {
-      wait_for_body(connection, response, params, [this, callback, &request, &response, &rule]()
+      wait_for_body(context, [this, callback, &request, &response, &rule]()
       {
         execute_rule(rule, request, response, std::bind(callback, RequestParser::Abort));
       });

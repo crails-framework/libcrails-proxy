@@ -49,10 +49,9 @@ namespace Crails
 
     ProxyRequestHandler();
 
-    void operator()(Connection&, BuildingResponse& out, Params& params, std::function<void(RequestParser::Status)>) const override;
-
+    void operator()(Context&, std::function<void(RequestParser::Status)>) const override;
   private:
-    void body_received(Connection&, BuildingResponse&, Params&, const std::string&) const override {}
+    void body_received(Context&, const std::string&) const override {}
     void execute_rule(const Rule&, const HttpRequest&, BuildingResponse&, std::function<void()> callback) const;
     void proxy(const Rule&, const HttpRequest&, BuildingResponse&, std::function<void()> callback) const;
     static std::string get_proxyfied_url(const ProxyRequest&);
