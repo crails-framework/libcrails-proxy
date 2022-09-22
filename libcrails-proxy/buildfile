@@ -1,7 +1,7 @@
 intf_libs = # Interface dependencies.
 impl_libs = # Implementation dependencies.
-import libs += libcrails%lib{crails}
-import libs += libcrails%lib{crails-http-client}
+import intf_libs += libcrails%lib{crails}
+import intf_libs += libcrails-http-client%lib{crails-http-client}
 
 lib{crails-proxy}: {hxx ixx txx cxx}{**} $impl_libs $intf_libs
 
