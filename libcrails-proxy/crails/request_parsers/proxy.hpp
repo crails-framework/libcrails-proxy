@@ -11,6 +11,7 @@ namespace Crails
   public:
     enum Mode
     {
+      DefaultMode,
       Redirect302,
       Proxy
     };
@@ -35,7 +36,7 @@ namespace Crails
 
     struct Rule
     {
-      Rule(const char* regex, const char* target, Mode = ProxyRequestHandler::default_mode);
+      Rule(const char* regex, const char* target, Mode = ProxyRequestHandler::DefaultMode);
       Rule(const char* regex, RuleSolver solver);
 
       bool operator==(const std::string& uri) const { return solver && std::regex_search(uri.c_str(), matcher); }
@@ -50,7 +51,7 @@ namespace Crails
     typedef std::vector<Rule> Rules;
     friend struct Rule;
 
-    ProxyRequestHandler();
+    ProxyRequestHandler(const Rules&, const Mode default_mode = Redirect302);
 
     void operator()(Context&, std::function<void(RequestParser::Status)>) const override;
   private:
@@ -59,8 +60,8 @@ namespace Crails
     void proxy(const Rule&, Context&, std::function<void()> callback) const;
     static std::string get_proxyfied_url(const ProxyRequest&);
 
-    static const Mode  default_mode;
-    static const Rules rules;
+    const Mode  default_mode;
+    const Rules rules;
   };
 }
 

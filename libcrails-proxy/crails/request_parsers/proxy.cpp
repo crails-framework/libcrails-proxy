@@ -12,7 +12,9 @@
 using namespace std;
 using namespace Crails;
 
-ProxyRequestHandler::ProxyRequestHandler()
+ProxyRequestHandler::ProxyRequestHandler(const Rules& rules, const Mode default_mode) :
+  default_mode(default_mode),
+  rules(std::move(rules))
 {
 }
 
@@ -54,8 +56,9 @@ void ProxyRequestHandler::execute_rule(const Rule& rule, Context& context, std::
 {
   const auto& request = context.connection->get_request();
   string destination(request.target());
+  Mode mode = rule.mode == DefaultMode ? default_mode : rule.mode;
 
-  if (rule.mode == Redirect302)
+  if (mode == Redirect302)
   {
     auto proxy_request = rule(request, string());
     context.response.set_header(HttpHeader::location, get_proxyfied_url(proxy_request));
