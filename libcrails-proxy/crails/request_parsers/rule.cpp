@@ -50,6 +50,8 @@ ProxyRequestHandler::ProxyRequest ProxyRequestHandler::Rule::defaultSolver(Proxy
       suffix = '/' + suffix;
     result.target(base_target + suffix);
   }
+  else
+    result.target("/");
   result.body() = body;
   return result;
 }
