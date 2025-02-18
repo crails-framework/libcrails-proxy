@@ -28,34 +28,50 @@ void ProxyRequestHandler::operator()(Context& context, function<void (RequestPar
     const Rule& rule = *it;
 
     context.params["uri"] = request.target();
+    context.vars["proxy-rule"] = &rule;
     if (request.method() != HttpVerb::get && request.method() != HttpVerb::head)
     {
-      wait_for_body(context, [this, callback, &request, &response, &rule]()
+      wait_for_body(context, [this, callback, &context, &rule]()
       {
-        execute_rule(rule, request, response, std::bind(callback, RequestParser::Abort));
+        execute_rule(rule, context, std::bind(callback, RequestParser::Abort));
       });
     }
     else
-      execute_rule(rule, request, response, std::bind(callback, RequestParser::Abort));
+      execute_rule(rule, context, std::bind(callback, RequestParser::Abort));
   }
   else
     callback(RequestParser::Continue);
 }
 
-void ProxyRequestHandler::execute_rule(const Rule& rule, const HttpRequest& request, BuildingResponse& response, std::function<void()> callback) const
+void ProxyRequestHandler::body_received(Context& context, const std::string& body) const
 {
+  const Rule& rule = *(cast<const Rule*>(context.vars, "proxy-rule"));
+
+  context.vars["body"] = &body;
+}
+
+void ProxyRequestHandler::execute_rule(const Rule& rule, Context& context, std::function<void()> callback) const
+{
+  const auto& request = context.connection->get_request();
   string destination(request.target());
 
   if (rule.mode == Redirect302)
   {
-    auto proxy_request = rule(request);
-    response.set_header(HttpHeader::location, get_proxyfied_url(proxy_request));
-    response.set_response(HttpStatus::temporary_redirect, "");
-    response.send();
+    auto proxy_request = rule(request, string());
+    context.response.set_header(HttpHeader::location, get_proxyfied_url(proxy_request));
+    context.response.set_response(HttpStatus::temporary_redirect, string_view(""));
+    context.response.send();
     callback();
   }
+  else if (request.method() != HttpVerb::get && request.method() != HttpVerb::head)
+  {
+    wait_for_body(context, [this, callback, &context, &rule]()
+    {
+      proxy(rule, context, callback);
+    });
+  }
   else
-    proxy(rule, request, response, callback);
+    proxy(rule, context, callback);
 }
 
 string ProxyRequestHandler::get_proxyfied_url(const ProxyRequest& request)
@@ -74,13 +90,14 @@ static void on_proxy_failure(const char* message, BuildingResponse& response, st
   response.set_status_code(HttpStatus::internal_server_error);
   response.send();
   callback();
-
 }
 
-void ProxyRequestHandler::proxy(const Rule& rule, const HttpRequest& request, BuildingResponse& response, std::function<void()> callback) const
+void ProxyRequestHandler::proxy(const Rule& rule, Context& context, std::function<void()> callback) const
 {
   shared_ptr<ClientInterface> http_client;
-  ProxyRequest proxy_request = rule(request);
+  SharedVars::const_iterator body_var = context.vars.find("body");
+  const string* body = body_var != context.vars.end() ? cast<const string*>(context.vars, "body") : nullptr;
+  ProxyRequest proxy_request = rule(context.connection->get_request(), body ? *body : std::string());
 
   if (proxy_request.ssl)
     http_client = make_shared<Ssl::Client>(proxy_request.host, proxy_request.port);
@@ -90,21 +107,24 @@ void ProxyRequestHandler::proxy(const Rule& rule, const HttpRequest& request, Bu
   {
     logger << "Crails:Proxy proxifying towards " << proxy_request.host << ':' << proxy_request.port << proxy_request.target() << Logger::endl;
     http_client->connect();
-    http_client->async_query(proxy_request, [&response, callback, http_client](const HttpResponse& remote_response, boost::beast::error_code ec)
+    http_client->async_query(proxy_request, [&context, callback, http_client](const ClientResponse& remote_response, boost::beast::error_code ec)
     {
-      if (!ec)
+      context.protect([&context, callback, &remote_response, ec]()
       {
-        response.get_raw_response() = remote_response;
-        response.send();
-        callback();
-      }
-      else
-        on_proxy_failure(ec.message().c_str(), response, callback);
+        if (!ec)
+        {
+          context.response.get_raw_response() = remote_response;
+          context.response.send();
+          callback();
+        }
+        else
+          on_proxy_failure(ec.message().c_str(), context.response, callback);
+      });
       try { http_client->disconnect(); } catch (...) {}
     });
   }
   catch (const std::exception& exception)
   {
-    on_proxy_failure(exception.what(), response, callback);
+    on_proxy_failure(exception.what(), context.response, callback);
   }
 }

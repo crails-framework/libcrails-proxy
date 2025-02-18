@@ -18,23 +18,23 @@ ProxyRequestHandler::ProxyRequestHandler::Rule::Rule(const char* regex, const ch
   base.method(HttpVerb::get);
   base.target(url.target);
   base.set(HttpHeader::host, url.host);
-  solver = std::bind(&Rule::defaultSolver, base, placeholders::_1, placeholders::_2);
+  solver = std::bind(&Rule::defaultSolver, base, placeholders::_1, placeholders::_2, placeholders::_3);
 }
 
 ProxyRequestHandler::Rule::Rule(const char* regex, ProxyRequestHandler::RuleSolver solver) : matcher(regex), mode(ProxyRequestHandler::Proxy), solver(solver)
 {
 }
 
-ProxyRequestHandler::ProxyRequest ProxyRequestHandler::Rule::operator()(const HttpRequest& source) const
+ProxyRequestHandler::ProxyRequest ProxyRequestHandler::Rule::operator()(const HttpRequest& source, const string& body) const
 {
   std::smatch matches;
   std::string uri(source.target());
 
   std::regex_search(uri, matches, matcher);
-  return solver(source, matches);
+  return solver(source, body, matches);
 }
 
-ProxyRequestHandler::ProxyRequest ProxyRequestHandler::Rule::defaultSolver(ProxyRequest result, const HttpRequest& source, const std::smatch& matches)
+ProxyRequestHandler::ProxyRequest ProxyRequestHandler::Rule::defaultSolver(ProxyRequest result, const HttpRequest& source, const std::string& body, const std::smatch& matches)
 {
   string base_target(result.target());
   string suffix(matches.suffix());
@@ -50,6 +50,6 @@ ProxyRequestHandler::ProxyRequest ProxyRequestHandler::Rule::defaultSolver(Proxy
       suffix = '/' + suffix;
     result.target(base_target + suffix);
   }
-  result.body() = source.body();
+  result.body() = body;
   return result;
 }
